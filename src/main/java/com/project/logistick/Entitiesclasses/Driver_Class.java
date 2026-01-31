@@ -1,6 +1,9 @@
 package com.project.logistick.Entitiesclasses;
 
+import jakarta.annotation.Generated;
 import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToOne;
 import jakarta.validation.constraints.Max;
@@ -12,17 +15,18 @@ import jakarta.validation.constraints.Size;
 @Entity
 public class Driver_Class {
 	@Id
-	@Positive
-	@Min(value=1)
-	@Max(value=100)
-	@NotNull
+	
 	private int id;
+
+	
+	
+	
 	@Size(min=2,max=20)
 	@NotNull
 	private String name;
 	@Positive
-	@Min(value=6000000000l)
-	@Max(value=9999999999l)
+	@Min(value=6000000000L)
+	@Max(value=9999999999L)
 	@NotNull
 	private long contact;
 	

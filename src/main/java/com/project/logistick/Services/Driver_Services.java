@@ -1,132 +1,109 @@
 package com.project.logistick.Services;
 
-import java.util.Optional;
+import java.util.List;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+
 import com.project.logistick.DTO.ResponceStucture;
 import com.project.logistick.Entitiesclasses.Carrier;
 import com.project.logistick.Entitiesclasses.Driver_Class;
 import com.project.logistick.Entitiesclasses.Truck;
-import com.project.logistick.Exceptions.DriverAlreadyExistException;
 import com.project.logistick.Exceptions.DriverNotFound;
-import com.project.logistick.Exceptions.DriverTruckCarrierNotFound;
 import com.project.logistick.Repositories.Carrier_Repo;
 import com.project.logistick.Repositories.Driver_Repo;
 import com.project.logistick.Repositories.Truck_Repo;
 
 @Service
 public class Driver_Services {
-	@Autowired
-	private Driver_Repo drrepo;
 
-	//save driver details
-	public ResponseEntity<ResponceStucture<Driver_Class>> saveDetails(Driver_Class d) {
-	
-		 Boolean present=drrepo.existsById(d.getId());
-			
-			ResponceStucture<Driver_Class> rs=new ResponceStucture<Driver_Class>();
-			if(present) {
-				throw new DriverAlreadyExistException();
-				
-			}
-			else
-			{  drrepo.save(d);
-				rs.setCode(HttpStatus.OK.value());
-				rs.setMessage("Truck details of id "+d.getId()+" saved");
-				rs.setData(d);
-			}
+    @Autowired
+    private Driver_Repo drrepo;
 
-			return new ResponseEntity<ResponceStucture<Driver_Class>>(rs,HttpStatus.OK );
-			
-		
-	}
-	//finding driver
+    @Autowired
+    private Carrier_Repo crrepo;
 
-	public ResponseEntity<ResponceStucture<Driver_Class>> findDriver(int id) {
-		
-			Optional<Driver_Class>dropt=drrepo.findById(id);
-					
-					ResponceStucture<Driver_Class> rs=new ResponceStucture<Driver_Class>();
-					if(dropt.isPresent()) {
-						rs.setCode(HttpStatus.OK.value());
-						rs.setMessage("Truck details of id "+id+" Found");
-						rs.setData(dropt.get());
-						
-					}
-					else
-					{
-						throw new DriverNotFound();
-					}
+    @Autowired
+    private Truck_Repo trepo;
 
-					return new ResponseEntity<ResponceStucture<Driver_Class>>(rs,HttpStatus.OK );
-	
-		
-	}
+    // ✅ SAVE DRIVER
+    public ResponseEntity<ResponceStucture<Driver_Class>> saveDriver(Driver_Class d) {
 
-	//delete driver
-	public ResponseEntity<ResponceStucture<Driver_Class>> deleteDriver(int id) {
-	
-		 Optional<Driver_Class>dropt=drrepo.findById(id);
-			
-			ResponceStucture<Driver_Class> rs=new ResponceStucture<Driver_Class>();
-			if(dropt.isPresent()) {
-				 drrepo.deleteById(id);
-					rs.setCode(HttpStatus.OK.value());
-					rs.setMessage("Deleting Address details with id "+id+" Deleted");
-					rs.setData(dropt.get());
-				
-			}
-			else
-			{ 
-				throw new DriverNotFound();
-			}
+        Driver_Class saved = drrepo.save(d);
 
-			return new ResponseEntity<ResponceStucture<Driver_Class>>(rs,HttpStatus.OK );
-		
-			
-		
-	}
-	
-	//update driver
+        ResponceStucture<Driver_Class> rs = new ResponceStucture<>();
+        rs.setCode(HttpStatus.CREATED.value());
+        rs.setMessage("Driver saved successfully");
+        rs.setData(saved);
 
-	@Autowired
-	private Carrier_Repo crrepo;
-	@Autowired Truck_Repo trepo;
-	
-	
-	Driver_Class dr=new Driver_Class();
-	
+        return new ResponseEntity<>(rs, HttpStatus.CREATED);
+    }
 
-	public ResponseEntity<ResponceStucture<Driver_Class>> updateDetails(int id) {
-		if(drrepo.existsById(id) && trepo.existsById(id)&& crrepo.existsById(id))
-		{
-			
-			dr=drrepo.findById(id).get();
-			
-			Truck truck=trepo.findById(id).get();
-			dr.setTruck(truck);
-			
-			Carrier cr= crrepo.findById(id).get();
-			dr.setCarrier(cr);
-			
-			dr=drrepo.save(dr);
-			}
-			else
-			{
-				throw new DriverTruckCarrierNotFound();
-			}
-			
-			ResponceStucture<Driver_Class> rs = new ResponceStucture<Driver_Class>();
+    // backward compatibility
+    public ResponseEntity<ResponceStucture<Driver_Class>> saveDetails(Driver_Class d) {
+        return saveDriver(d);
+    }
 
-			rs.setCode(HttpStatus.CREATED.value());
-			rs.setMessage("Driver,truck and carrier updated successfully");
-			rs.setData(dr);
+    // ✅ LIST ALL DRIVERS (FIXES CONTROLLER ERROR)
+    public List<Driver_Class> getAllDrivers() {
+        return drrepo.findAll();
+    }
 
-			return new ResponseEntity<ResponceStucture<Driver_Class>>(rs, HttpStatus.OK);
-			
-	}
-	
+    // ✅ FIND DRIVER
+    public ResponseEntity<ResponceStucture<Driver_Class>> findDriver(int id) {
 
+        Driver_Class driver = drrepo.findById(id)
+                .orElseThrow(DriverNotFound::new);
+
+        ResponceStucture<Driver_Class> rs = new ResponceStucture<>();
+        rs.setCode(HttpStatus.OK.value());
+        rs.setMessage("Driver found");
+        rs.setData(driver);
+
+        return ResponseEntity.ok(rs);
+    }
+
+    // ✅ DELETE DRIVER
+    public ResponseEntity<ResponceStucture<String>> deleteDriver(int id) {
+
+        Driver_Class driver = drrepo.findById(id)
+                .orElseThrow(DriverNotFound::new);
+
+        drrepo.delete(driver);
+
+        ResponceStucture<String> rs = new ResponceStucture<>();
+        rs.setCode(HttpStatus.OK.value());
+        rs.setMessage("Driver deleted successfully");
+        rs.setData("Deleted");
+
+        return ResponseEntity.ok(rs);
+    }
+
+    // ✅ ASSIGN TRUCK & CARRIER
+    public ResponseEntity<ResponceStucture<Driver_Class>> assignTruckToDriver(
+            int driverId, int truckId, int carrierId) {
+
+        Driver_Class driver = drrepo.findById(driverId)
+                .orElseThrow(DriverNotFound::new);
+
+        Truck truck = trepo.findById(truckId)
+                .orElseThrow(() -> new RuntimeException("Truck not found"));
+
+        Carrier carrier = crrepo.findById(carrierId)
+                .orElseThrow(() -> new RuntimeException("Carrier not found"));
+
+        driver.setTruck(truck);
+        driver.setCarrier(carrier);
+
+        Driver_Class updated = drrepo.save(driver);
+
+        ResponceStucture<Driver_Class> rs = new ResponceStucture<>();
+        rs.setCode(HttpStatus.OK.value());
+        rs.setMessage("Truck & Carrier assigned to driver");
+        rs.setData(updated);
+
+        return ResponseEntity.ok(rs);
+    }
 }

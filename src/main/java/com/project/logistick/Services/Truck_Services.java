@@ -1,6 +1,8 @@
 package com.project.logistick.Services;
 
-import java.util.Optional;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -9,101 +11,82 @@ import org.springframework.stereotype.Service;
 
 import com.project.logistick.DTO.ResponceStucture;
 import com.project.logistick.Entitiesclasses.Carrier;
+import com.project.logistick.Entitiesclasses.Driver_Class;
 import com.project.logistick.Entitiesclasses.Truck;
-import com.project.logistick.Exceptions.TruckAlreadyExistException;
-import com.project.logistick.Exceptions.TruckAndCArrierNotFound;
 import com.project.logistick.Exceptions.TruckNotFound;
 import com.project.logistick.Repositories.Carrier_Repo;
+import com.project.logistick.Repositories.Driver_Repo;
 import com.project.logistick.Repositories.Truck_Repo;
+import com.project.logistick.Repositories.Order_Repo; // ADD THIS
 
 @Service
 public class Truck_Services {
-	@Autowired
-	private Truck_Repo trepo;
 
-	// saving Details
-	public ResponseEntity<ResponceStucture<Truck>> saveDetails(Truck t) {
+    @Autowired private Truck_Repo truckRepo;
+    @Autowired private Carrier_Repo carrierRepo;
+    @Autowired private Driver_Repo driverRepo;
+    @Autowired private Order_Repo orderRepo; // ADD THIS
 
-		Boolean present = trepo.existsById(t.getId());
+    public ResponseEntity<ResponceStucture<Truck>> saveTruck(Truck truck) {
+        Truck saved = truckRepo.save(truck);
+        ResponceStucture<Truck> rs = new ResponceStucture<>();
+        rs.setCode(HttpStatus.CREATED.value());
+        rs.setMessage("Truck saved successfully");
+        rs.setData(saved);
+        return new ResponseEntity<>(rs, HttpStatus.CREATED);
+    }
 
-		ResponceStucture<Truck> rs = new ResponceStucture<Truck>();
-		if (present) {
+    public ResponseEntity<ResponceStucture<Truck>> saveDetails(Truck truck) {
+        return saveTruck(truck);
+    }
 
-			throw new TruckAlreadyExistException();
+    // ✅ List all trucks
+    public List<Truck> getAllTrucks() {
+        return truckRepo.findAll();
+    }
 
-		} else {
-			trepo.save(t);
-			rs.setCode(HttpStatus.OK.value());
-			rs.setMessage("Truck details of id " + t.getId() + " saved");
-			rs.setData(t);
-		}
+    // ✅ NEW: Get truck order counts (for 20-order limit)
+    public Map<Integer, Integer> getTruckOrderCounts() {
+        List<Truck> trucks = truckRepo.findAll();
+        Map<Integer, Integer> orderCounts = new HashMap<>();
+        
+        for (Truck truck : trucks) {
+            // Count orders assigned to this truck
+            long count = orderRepo.countByTruckId(truck.getId());
+            orderCounts.put(truck.getId(), (int) count);
+        }
+        return orderCounts;
+    }
 
-		return new ResponseEntity<ResponceStucture<Truck>>(rs, HttpStatus.OK);
-	}
+    public ResponseEntity<ResponceStucture<String>> deleteTruck(int id) {
+        Truck truck = truckRepo.findById(id).orElseThrow(TruckNotFound::new);
+        truckRepo.delete(truck);
+        ResponceStucture<String> rs = new ResponceStucture<>();
+        rs.setCode(HttpStatus.OK.value());
+        rs.setMessage("Truck deleted");
+        rs.setData("Deleted");
+        return ResponseEntity.ok(rs);
+    }
 
-	// finding details
-	public ResponseEntity<ResponceStucture<Truck>> findById(int id) {
-		Optional<Truck> tropt = trepo.findById(id);
+    public ResponseEntity<ResponceStucture<Truck>> updateTruckByNumber(String truckNumber, Integer carrierId, Integer driverId) {
+        Truck truck = truckRepo.findByNumber(truckNumber);
+        if (truck == null) throw new TruckNotFound();
 
-		ResponceStucture<Truck> rs = new ResponceStucture<Truck>();
-		if (tropt.isPresent()) {
-			rs.setCode(HttpStatus.OK.value());
-			rs.setMessage("Truck details of id " + id + " Found");
-			rs.setData(tropt.get());
-
-		} else {
-
-			throw new TruckNotFound();
-		}
-
-		return new ResponseEntity<ResponceStucture<Truck>>(rs, HttpStatus.OK);
-
-	}
-
-	// delete truck
-	public ResponseEntity<ResponceStucture<Truck>> deleteTruck(int id) {
-
-		Optional<Truck> topt = trepo.findById(id);
-
-		ResponceStucture<Truck> rs = new ResponceStucture<Truck>();
-		if (topt.isPresent()) {
-			trepo.deleteById(id);
-			rs.setCode(HttpStatus.OK.value());
-			rs.setMessage("Deleting Address details with id " + id + " Deleted");
-			rs.setData(topt.get());
-
-		} else {
-			throw new TruckNotFound();
-		}
-		return new ResponseEntity<ResponceStucture<Truck>>(rs, HttpStatus.OK);
-
-	}
-
-	//update truck
-	Truck truck=new Truck();
-	@Autowired
-	Carrier_Repo crrepo;
-
-	public ResponseEntity<ResponceStucture<Truck>> updateByIds(int id) {
-		if(trepo.existsById(id) && crrepo.existsById(id))
-		{
-			truck=trepo.findById(id).get();
-			Carrier cr = crrepo.findById(id).get();
-		truck.setCarrier(cr);
-			truck = trepo.save(truck);		} 
-		else {
-			throw new TruckAndCArrierNotFound();}
-				ResponceStucture<Truck> rs = new ResponceStucture<Truck>();
-
-		rs.setCode(HttpStatus.CREATED.value());
-		rs.setMessage("truck and carrier updated successfully");
-		rs.setData(truck);
-
-		return new ResponseEntity<ResponceStucture<Truck>>(rs, HttpStatus.OK);
-
-			
-		}
-		
-	}
-
-
+        if (carrierId != null) {
+            Carrier carrier = carrierRepo.findById(carrierId)
+                    .orElseThrow(() -> new RuntimeException("Carrier not found"));
+            truck.setCarrier(carrier);
+        }
+        if (driverId != null) {
+            Driver_Class driver = driverRepo.findById(driverId)
+                    .orElseThrow(() -> new RuntimeException("Driver not found"));
+            truck.setDriver(driver);
+        }
+        Truck updated = truckRepo.save(truck);
+        ResponceStucture<Truck> rs = new ResponceStucture<>();
+        rs.setCode(HttpStatus.OK.value());
+        rs.setMessage("Truck updated");
+        rs.setData(updated);
+        return ResponseEntity.ok(rs);
+    }
+}

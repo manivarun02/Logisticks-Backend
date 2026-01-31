@@ -1,5 +1,6 @@
 package com.project.logistick.Services;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -8,84 +9,60 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import com.project.logistick.DTO.ResponceStucture;
-import com.project.logistick.Entitiesclasses.Address;
-
 import com.project.logistick.Entitiesclasses.Unloading;
-import com.project.logistick.Exceptions.AdressNotFound;
-import com.project.logistick.Exceptions.UnloadAdressNotFOund;
-import com.project.logistick.Repositories.Adress_Repo;
 import com.project.logistick.Repositories.Unloading_repo;
 
 @Service
 public class Unloading_Services {
-	@Autowired
-	private Adress_Repo adressrepo;
-	@Autowired
-	private Unloading_repo unloadrepo;
-	Address ad=new Address();
-	public ResponseEntity<ResponceStucture<Unloading>> addDeliverAdress(Unloading unload) {
-//		
-//       Optional<Address>adopt=adress.findById(unload.getId());
-		Boolean present=adressrepo.existsById(unload.getId());
-		ResponceStucture<Unloading> rs=new ResponceStucture<Unloading>();
-		
-		if(present) {
-			unloadrepo.save(ad);
-			
-			rs.setCode(HttpStatus.OK.value());
-			rs.setMessage("Delivery Adress details of id Found");
-			rs.setData(unload);	
-		   }
-		else
-		{
 
-			throw new AdressNotFound();
-		}
-		return new ResponseEntity<ResponceStucture<Unloading>>(HttpStatus.OK );
-		
-		
-	}
+    @Autowired
+    private Unloading_repo unloadingRepo;
 
-	public ResponseEntity<ResponceStucture<Address>> findDelivery(int id) {
-		
-		 adressrepo.findById(id).get();
-		
-		ResponceStucture<Address> rs=new ResponceStucture<Address>();
-		if(adressrepo.existsById(id)) {
-			rs.setCode(HttpStatus.OK.value());
-			rs.setData(ad);
+    // ✅ GET ALL UNLOADING LOCATIONS
+    public List<Unloading> getAllUnloadings() {
+        return unloadingRepo.findAll();
+    }
 
-			
-		}
-		else
-		{
+    public ResponseEntity<ResponceStucture<Unloading>> saveUnloading(Unloading unloading) {
+        Unloading saved = unloadingRepo.save(unloading);
+        ResponceStucture<Unloading> rs = new ResponceStucture<>();
+        rs.setCode(HttpStatus.CREATED.value());
+        rs.setMessage("Unloading location saved");
+        rs.setData(saved);
+        return new ResponseEntity<>(rs, HttpStatus.CREATED);
+    }
 
-			throw new AdressNotFound();
-		}
-		return new ResponseEntity<ResponceStucture<Address>>(HttpStatus.OK );
-		
-	}
+    public ResponseEntity<ResponceStucture<Unloading>> findUnloading(Integer id) {
+        Optional<Unloading> opt = unloadingRepo.findById(id);
+        ResponceStucture<Unloading> rs = new ResponceStucture<>();
+        
+        if (opt.isPresent()) {
+            rs.setCode(HttpStatus.OK.value());
+            rs.setMessage("Unloading found");
+            rs.setData(opt.get());
+            return ResponseEntity.ok(rs);
+        }
+        
+        rs.setCode(HttpStatus.NOT_FOUND.value());
+        rs.setMessage("Unloading not found");
+        rs.setData(null);
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(rs);
+    }
 
-	public ResponseEntity<ResponceStucture<Unloading>> cancleDetails(int id) {
-
-		 Optional<Unloading>loadopt=unloadrepo.findById(id);
-			
-			ResponceStucture<Unloading> rs=new ResponceStucture<Unloading>();
-			if(loadopt.isPresent()) {
-				 unloadrepo.deleteById(id);
-					rs.setCode(HttpStatus.OK.value());
-					rs.setMessage("Deleting unloading address details with id "+id+" Deleted");
-					rs.setData(loadopt.get());
-				
-			}
-			else
-			{ 
-
-				throw new UnloadAdressNotFOund();
-			}
-
-			return new ResponseEntity<ResponceStucture<Unloading>>(rs,HttpStatus.OK );
-				
-	}
-
+    public ResponseEntity<ResponceStucture<String>> deleteUnloading(Integer id) {
+        ResponceStucture<String> rs = new ResponceStucture<>();
+        
+        if (unloadingRepo.existsById(id)) {
+            unloadingRepo.deleteById(id);
+            rs.setCode(HttpStatus.OK.value());
+            rs.setMessage("Unloading deleted");
+            rs.setData("Deleted");
+            return ResponseEntity.ok(rs);
+        }
+        
+        rs.setCode(HttpStatus.NOT_FOUND.value());
+        rs.setMessage("Unloading not found");
+        rs.setData(null);
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(rs);
+    }
 }

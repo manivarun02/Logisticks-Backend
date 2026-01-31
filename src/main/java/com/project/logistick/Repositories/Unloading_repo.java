@@ -8,7 +8,7 @@ import com.project.logistick.Entitiesclasses.Unloading;
 @Repository
 public interface Unloading_repo extends JpaRepository<Unloading, Integer> {
 
-	void save(Address adress);
+	
 
 
 }

@@ -1,280 +1,287 @@
 package com.project.logistick.Services;
 
-import java.text.SimpleDateFormat;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
-import java.util.Date;
+import java.util.List;
 import java.util.Optional;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import com.project.logistick.Entitiesclasses.Address;
-import com.project.logistick.Entitiesclasses.Cargo;
-import com.project.logistick.Entitiesclasses.Loading;
-import com.project.logistick.Entitiesclasses.Order;
-import com.project.logistick.Entitiesclasses.Truck;
-import com.project.logistick.Entitiesclasses.Unloading;
-import com.project.logistick.Exceptions.OrderCanceled;
-import com.project.logistick.Exceptions.OrderNotFound;
-import com.project.logistick.Exceptions.OrderNotPending;
-import com.project.logistick.Exceptions.TruckCapacity;
-import com.project.logistick.Repositories.Adress_Repo;
-import com.project.logistick.Repositories.Cargo_Repo;
-import com.project.logistick.Repositories.Carrier_Repo;
-import com.project.logistick.Repositories.Loading_Repo;
-import com.project.logistick.Repositories.Order_Repo;
-import com.project.logistick.Repositories.Truck_Repo;
-import com.project.logistick.Repositories.Unloading_repo;
+
 import com.project.logistick.DTO.OrderDto;
+import com.project.logistick.DTO.PricePreviewResponse;
 import com.project.logistick.DTO.ResponceStucture;
+import com.project.logistick.Entitiesclasses.Cargo;
+import com.project.logistick.Entitiesclasses.Order;
+import com.project.logistick.Repositories.Cargo_Repo;
+import com.project.logistick.Repositories.Order_Repo;
 
 @Service
 public class Order_Services {
-	@Autowired
-	private Order_Repo orderepo;
-	@Autowired
-	private Adress_Repo adrepo;
-	@Autowired
-	private Cargo_Repo crepo;
-	@Autowired
-	private Loading_Repo lrepo;
-	@Autowired
-	private Unloading_repo unrepo;
 
-	public ResponseEntity<ResponceStucture<Order>> orderPlacing(OrderDto orderdto) {
-		Order od=new Order();
-		
-		Date date=new Date();
-		SimpleDateFormat format=new SimpleDateFormat("yyyy-MM-dd");
-		String currentDate=format.format(date);
-		
-		double cost=100*(orderdto.getCargowieght()*orderdto.getCarcount());
-		//order class
-		od.setOrderDate(currentDate);
-		od.setCost(cost);
-		od.setCarrier(null);
-		//cargo class
-		Cargo cargo=new Cargo();
-		cargo.setId(orderdto.getCargoid());
-		cargo.setCount(orderdto.getCarcount());
-		cargo.setDiscription(orderdto.getCargodiscription());
-		cargo.setName(orderdto.getCargoname());
-		cargo.setWeight(orderdto.getCargowieght());
-		cargo=crepo.save(cargo);
-		
-		od.setCargo(cargo);
-		//loading class
-		Loading load=new Loading();
-		Address adres=adrepo.findById(orderdto.getLoadid()).get();
-		load.setId(orderdto.getLoadid());
-		load.setAdress(adres);
-		
-		load=lrepo.save(load);
-		od.setLoading(load);
-		//unloading class
-		Unloading unload=new Unloading();
-		Address unloadadres=adrepo.findById(orderdto.getUnloadid()).get();
-		unload.setId(orderdto.getUnloadid());
-		unload.setAdress(unloadadres);
-		unload=unrepo.save(unload);
-		
-		od.setUnloading(unload);
-		orderepo.save(od);
-		
-		ResponceStucture<Order> rs= new ResponceStucture<Order>();
-		
-		rs.setCode(HttpStatus.CREATED.value());
-		rs.setMessage("Order Placed successfully");
-		rs.setData(od);
-		
-		return new ResponseEntity<ResponceStucture<Order>>(rs,HttpStatus.OK);
-	
-	}
+    @Autowired
+    private Order_Repo orderRepo;
+    
+    @Autowired
+    private Cargo_Repo cargoRepo;
 
-	//finding order
-	public ResponseEntity<ResponceStucture<Order>> tracingOrder(int id) {
-		Optional<Order>ordopt=orderepo.findById(id);
-		ResponceStucture<Order> rs=new ResponceStucture<Order>();
-		if(ordopt.isPresent()) {
-			rs.setCode(HttpStatus.OK.value());
-			rs.setMessage("Order details of id "+id+" Found");
-			rs.setData(ordopt.get());
-			
-		}
-		else
-		{
+    // ================= PRICE PREVIEW =================
+    public ResponseEntity<ResponceStucture<PricePreviewResponse>> pricePreview(OrderDto dto) {
 
-			throw new OrderNotFound();
-		}
+        ResponceStucture<PricePreviewResponse> rs = new ResponceStucture<>();
 
-		return new ResponseEntity<ResponceStucture<Order>>(rs,HttpStatus.OK );
-	}
+        if (dto.getTotalWeightKg() == null || dto.getTotalWeightKg() <= 0) {
+            rs.setCode(HttpStatus.BAD_REQUEST.value());
+            rs.setMessage("Total weight is required");
+            rs.setData(null);
+            return ResponseEntity.badRequest().body(rs);
+        }
 
-	//cancle or delete order
-	public ResponseEntity<ResponceStucture<Order>> cancleOrder(int id) {
-		
-		ResponceStucture<Order> rs=new ResponceStucture<Order>();
-	
-		boolean present=orderepo.existsById(id);
-		if(present)
-		{
-			Order odr=orderepo.findById(id).get();
-			if(odr.getStatus().equals("pending")) {
-			odr.setStatus("cancle");
-			//removing loading and unloading details
-			odr.setLoading(null);
-			odr.setUnloading(null);
-			//Removing carrier
-			odr.setCarrier(null);
-			//Removing cargo
-			odr.setCargo(null);
-			
-			orderepo.save(odr);
-			rs.setCode(HttpStatus.OK.value());
-			rs.setMessage("cancling the order with details of   id "+id);
-			rs.setData(odr);
-		}
-		      else
-		    {
-			
-			   throw new OrderNotPending();
-	     	}
-		}
-		else {
-		
-			throw new OrderNotFound();
-		}
-      	return new ResponseEntity<ResponceStucture<Order>>(rs,HttpStatus.OK );
-		
-		
-	}
+        double distanceKm = 150.0;
+        double cost = (dto.getTotalWeightKg() * 10) + (distanceKm * 10);
 
-	//update carrier by truck id assigning
-	@Autowired
-	Truck_Repo trepo;
-	@Autowired
-	Carrier_Repo carepo;
+        PricePreviewResponse response = new PricePreviewResponse();
+        response.setDistanceKm(distanceKm);
+        response.setCost(cost);
 
-	public ResponseEntity<ResponceStucture<Order>> updateOrder(int id,int truckid) {
-		
-	 Order oder=orderepo.findById(id).get();
-	 Truck tr=trepo.findById(truckid).get();
-	 int truckcapacity=tr.getCapacity();
-	 int orderweight=oder.getCargo().getWeight()*oder.getCargo().getCount();
-	 
-	 if(truckcapacity>=orderweight)
-	 {
-		 tr.setCapacity(tr.getCapacity()-orderweight);
-		 oder.setCarrier(tr.getCarrier());
-		 oder.setStatus("pending");
-		 
-		 orderepo.save(oder);
-		 trepo.save(tr);
-	 }
-	 else
-	 {
-		 throw new TruckCapacity();
-	 }
-	 ResponceStucture<Order> rs = new ResponceStucture<Order>();
+        rs.setCode(HttpStatus.OK.value());
+        rs.setMessage("Price calculated successfully");
+        rs.setData(response);
 
-		rs.setCode(HttpStatus.CREATED.value());
-		rs.setMessage("truck and carrier updated successfully");
-		rs.setData(oder);
+        return ResponseEntity.ok(rs);
+    }
 
-		return new ResponseEntity<ResponceStucture<Order>>(rs, HttpStatus.OK);
-		
-	}
+    // ================= PLACE ORDER (UPDATED WITH CARGO CREATION) =================
+    public ResponseEntity<ResponceStucture<Order>> orderPlacing(OrderDto dto) {
 
-	public ResponseEntity<ResponceStucture<Order>> updateLoadingUnloadingDate(int orderid) {
-		Order od=orderepo.findById(orderid).get();
-		
-		
-		if(od.getStatus().equals("cancle")) {
-			throw new OrderCanceled();
-		}
-		else {
+        ResponceStucture<Order> rs = new ResponceStucture<>();
 
-			//loading  date setting
-			Date date=new Date();
-			SimpleDateFormat format=new SimpleDateFormat("yyyy-MM-dd");
-			String currentDate=format.format(date);
-			//time setting
-			 LocalTime currentTime = LocalTime.now();
-			 DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm:ss");
-		     String time = currentTime.format(formatter);
+        try {
+            // ✅ STEP 1: VALIDATE CARGO DETAILS
+            if (dto.getCargoName() == null || dto.getCargoName().trim().isEmpty()) {
+                rs.setCode(HttpStatus.BAD_REQUEST.value());
+                rs.setMessage("Cargo name is required");
+                rs.setData(null);
+                return ResponseEntity.badRequest().body(rs);
+            }
 
-			 od.getLoading().setDate(currentDate);
-			 od.getLoading().setTime(time);
-			 
-			 //unloading date setting
-			    LocalDate today = LocalDate.now();
-			    LocalDate futureDate = today.plusDays(5);
-			    //time setting
-		        DateTimeFormatter futureformatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
-		        String futuredate = futureDate.format(futureformatter);
-		        LocalDateTime now = LocalDateTime.now();
-		        // Add 5 days
-		        LocalDateTime futureDateTime = now.plusDays(5);
-		        // Format as String
-		        DateTimeFormatter futureTime = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
-		        String dateTime = futureDateTime.format(futureTime);
-		        //setting unloading
-			    od.getUnloading().setDate(futuredate);
-			    od.getUnloading().setTime(dateTime);
-			    //saving
-			    orderepo.save(od);
-		}
-		 
-		    ResponceStucture<Order> rs = new ResponceStucture<Order>();
+            if (dto.getCargoDescription() == null || dto.getCargoDescription().trim().isEmpty()) {
+                rs.setCode(HttpStatus.BAD_REQUEST.value());
+                rs.setMessage("Cargo description is required");
+                rs.setData(null);
+                return ResponseEntity.badRequest().body(rs);
+            }
 
-			rs.setCode(HttpStatus.CREATED.value());
-			rs.setMessage("Loading,unloading date and time updated successfully");
-			rs.setData(od);
+            if (dto.getTotalWeightKg() == null || dto.getTotalWeightKg() <= 0) {
+                rs.setCode(HttpStatus.BAD_REQUEST.value());
+                rs.setMessage("Valid cargo weight is required");
+                rs.setData(null);
+                return ResponseEntity.badRequest().body(rs);
+            }
 
-			return new ResponseEntity<ResponceStucture<Order>>(rs, HttpStatus.OK);
+            // ✅ STEP 2: CREATE AND SAVE CARGO FIRST
+            Cargo cargo = new Cargo();
+            cargo.setName(dto.getCargoName().trim());
+            cargo.setDescription(dto.getCargoDescription().trim());
+            cargo.setWeight(dto.getTotalWeightKg().intValue()); // Convert Double to int
+            cargo.setCount(dto.getCargoCount() != null ? dto.getCargoCount() : 1);
 
-		
-		
-	}
-	
+            Cargo savedCargo = cargoRepo.save(cargo);
+            System.out.println("✅ Cargo saved with ID: " + savedCargo.getId());
+
+            // ✅ STEP 3: CREATE ORDER WITH CARGO ID
+            Order order = new Order();
+            order.setUserId(dto.getUserId());
+            order.setCargoId(savedCargo.getId());
+            order.setLoadingId(dto.getLoadingId());
+            order.setUnloadingId(dto.getUnloadingId());
+            order.setTotalWeightKg(dto.getTotalWeightKg() != null ? dto.getTotalWeightKg().intValue() : 0); // Convert Double to int
+
+            double distanceKm = 150.0;
+            order.setDistanceKm(distanceKm);
+
+            double cost = (dto.getTotalWeightKg() * 10) + (distanceKm * 10);
+            order.setCost(cost);
+
+            order.setPaymentMethod(dto.getPaymentMethod() != null ? dto.getPaymentMethod() : "COD");
+            order.setPaymentStatus("PENDING");
+            order.setPaymentAmount(cost);
+
+            order.setStatus("PLACED");
+            order.setOrderDate(LocalDate.now());
+
+            order.setTruckId(null);
+            order.setDriverId(null);
+            order.setCarrierId(null);
+
+            Order savedOrder = orderRepo.save(order);
+            System.out.println("✅ Order saved with ID: " + savedOrder.getId() + ", Cargo ID: " + savedOrder.getCargoId());
+
+            rs.setCode(HttpStatus.CREATED.value());
+            rs.setMessage("Order placed successfully with cargo details");
+            rs.setData(savedOrder);
+
+            return new ResponseEntity<>(rs, HttpStatus.CREATED);
+
+        } catch (Exception e) {
+            System.err.println("❌ Error placing order: " + e.getMessage());
+            e.printStackTrace();
+            
+            rs.setCode(HttpStatus.INTERNAL_SERVER_ERROR.value());
+            rs.setMessage("Failed to place order: " + e.getMessage());
+            rs.setData(null);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(rs);
+        }
+    }
+
+    // ================= GET ALL ORDERS =================
+    public List<Order> getAllOrders() {
+        return orderRepo.findAll();
+    }
+
+    // ================= GET USER ORDERS =================
+    public List<Order> getOrdersByUser(Long userId) {
+        return orderRepo.findByUserId(userId);
+    }
+
+    // ================= TRACK ORDER =================
+    public ResponseEntity<ResponceStucture<Order>> tracingOrder(Long orderId) {
+
+        Optional<Order> opt = orderRepo.findById(orderId);
+        ResponceStucture<Order> rs = new ResponceStucture<>();
+
+        if (opt.isPresent()) {
+            rs.setCode(HttpStatus.OK.value());
+            rs.setMessage("Order found");
+            rs.setData(opt.get());
+            return ResponseEntity.ok(rs);
+        }
+
+        rs.setCode(HttpStatus.NOT_FOUND.value());
+        rs.setMessage("Order not found");
+        rs.setData(null);
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(rs);
+    }
+
+    // ================= CANCEL ORDER =================
+    public ResponseEntity<ResponceStucture<Order>> cancelOrder(Long id) {
+
+        Optional<Order> opt = orderRepo.findById(id);
+        ResponceStucture<Order> rs = new ResponceStucture<>();
+
+        if (opt.isPresent()) {
+            Order order = opt.get();
+            order.setStatus("CANCELLED");
+            orderRepo.save(order);
+
+            rs.setCode(HttpStatus.OK.value());
+            rs.setMessage("Order cancelled successfully");
+            rs.setData(order);
+            return ResponseEntity.ok(rs);
+        }
+
+        rs.setCode(HttpStatus.NOT_FOUND.value());
+        rs.setMessage("Order not found");
+        rs.setData(null);
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(rs);
+    }
+
+    // ================= ADMIN: ASSIGN TRUCK ONLY =================
+    public ResponseEntity<ResponceStucture<Order>> assignOrderToTruck(Long orderId, Integer truckId) {
+
+        Optional<Order> opt = orderRepo.findById(orderId);
+        ResponceStucture<Order> rs = new ResponceStucture<>();
+
+        if (opt.isPresent()) {
+            Order order = opt.get();
+            order.setTruckId(truckId);
+            order.setStatus("ASSIGNED");
+            orderRepo.save(order);
+
+            rs.setCode(HttpStatus.OK.value());
+            rs.setMessage("Truck assigned successfully");
+            rs.setData(order);
+            return ResponseEntity.ok(rs);
+        }
+
+        rs.setCode(HttpStatus.NOT_FOUND.value());
+        rs.setMessage("Order not found");
+        rs.setData(null);
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(rs);
+    }
+
+    // ✅ FULL ASSIGNMENT (TRUCK + DRIVER + CARRIER)
+    public ResponseEntity<ResponceStucture<Order>> assignFullOrder(Long orderId, Integer truckId, Integer driverId, Integer carrierId) {
+
+        Optional<Order> opt = orderRepo.findById(orderId);
+        ResponceStucture<Order> rs = new ResponceStucture<>();
+
+        if (opt.isPresent()) {
+            Order order = opt.get();
+            
+            System.out.println("🔄 Assigning order #" + orderId);
+            System.out.println("   Truck ID: " + truckId);
+            System.out.println("   Driver ID: " + driverId);
+            System.out.println("   Carrier ID: " + carrierId);
+            
+            if (truckId != null) {
+                order.setTruckId(truckId);
+                System.out.println("   ✅ Truck assigned");
+            }
+            if (driverId != null) {
+                order.setDriverId(driverId);
+                System.out.println("   ✅ Driver assigned");
+            }
+            if (carrierId != null) {
+                order.setCarrierId(carrierId);
+                System.out.println("   ✅ Carrier assigned");
+            }
+            
+            if (truckId != null && driverId != null && carrierId != null) {
+                order.setStatus("FULLY_ASSIGNED");
+                System.out.println("   ✅ Status: FULLY_ASSIGNED");
+            } else if (truckId != null) {
+                order.setStatus("ASSIGNED");
+                System.out.println("   ✅ Status: ASSIGNED");
+            }
+            
+            Order savedOrder = orderRepo.save(order);
+            System.out.println("✅ Order #" + orderId + " saved successfully");
+
+            rs.setCode(HttpStatus.OK.value());
+            rs.setMessage("Assignment successful");
+            rs.setData(savedOrder);
+            return ResponseEntity.ok(rs);
+        }
+
+        System.err.println("❌ Order #" + orderId + " not found");
+        rs.setCode(HttpStatus.NOT_FOUND.value());
+        rs.setMessage("Order not found");
+        rs.setData(null);
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(rs);
+    }
+
+    // ================= ADMIN: UPDATE STATUS =================
+    public ResponseEntity<ResponceStucture<Order>> updateLoadingUnloadingDate(Long orderId) {
+
+        Optional<Order> opt = orderRepo.findById(orderId);
+        ResponceStucture<Order> rs = new ResponceStucture<>();
+
+        if (opt.isPresent()) {
+            Order order = opt.get();
+            order.setStatus("IN_TRANSIT");
+            orderRepo.save(order);
+
+            rs.setCode(HttpStatus.OK.value());
+            rs.setMessage("Order moved to transit");
+            rs.setData(order);
+            return ResponseEntity.ok(rs);
+        }
+
+        rs.setCode(HttpStatus.NOT_FOUND.value());
+        rs.setMessage("Order not found");
+        rs.setData(null);
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(rs);
+    }
 }
-
-//	public ResponseEntity<ResponceStucture<Order>> updateunloadingdate(int id) {
-//		Order od=orderepo.findById(id).get();
-//		 LocalDate today = LocalDate.now();
-//		    LocalDate futureDate = today.plusDays(5);
-//
-//	        DateTimeFormatter futureformatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
-//	        String futuredate = futureDate.format(futureformatter);
-//	        
-//	        LocalDateTime now = LocalDateTime.now();
-//
-//	        // Add 5 days
-//	        LocalDateTime futureDateTime = now.plusDays(5);
-//
-//	        // Format as String
-//	        DateTimeFormatter futureTime = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
-//	        String dateTime = futureDateTime.format(futureTime);
-//
-//
-//
-//		 od.getUnloading().setDate(futuredate);
-//		 od.getUnloading().setTime(dateTime);
-//		 
-//		 
-//		 orderepo.save(od);
-//		 
-//		 ResponceStucture<Order> rs = new ResponceStucture<Order>();
-//
-//			rs.setCode(HttpStatus.CREATED.value());
-//			rs.setMessage("Unoading date and time updated successfully");
-//			rs.setData(od);
-//
-//			return new ResponseEntity<ResponceStucture<Order>>(rs, HttpStatus.OK);
-//		
-//	}
-	
-
