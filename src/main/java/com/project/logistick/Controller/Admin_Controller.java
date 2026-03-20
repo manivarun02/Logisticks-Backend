@@ -18,7 +18,7 @@ import com.project.logistick.Services.*;
 
 @RestController
 @RequestMapping("/admin")
-@CrossOrigin(origins = { "http://localhost:3000", "http://localhost:5173" })
+
 public class Admin_Controller {
 
     @Autowired private Truck_Services trservice;
