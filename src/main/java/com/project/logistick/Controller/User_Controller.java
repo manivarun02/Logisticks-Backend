@@ -16,7 +16,6 @@ import com.project.logistick.Services.*;
 
 @RestController
 @RequestMapping("/user")
-@CrossOrigin(origins = { "http://localhost:3000", "http://localhost:5173" })
 public class User_Controller {
 
     @Autowired private UsersService userService;
